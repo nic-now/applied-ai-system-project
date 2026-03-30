@@ -10,8 +10,9 @@
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+- Design did change during implementation.
+- For example, relationship from pet to task was added, so that task can be associated with a specific pet too (since an owner might have multiple pets)
+- Safeguards were also added based on recommendations by Claude Code (e.g. check time_available_mins)
 
 ---
 

@@ -8,7 +8,8 @@ class Task:
     name: str
     category: str          # e.g. "walk", "feeding", "meds", "grooming"
     duration_mins: int
-    priority: int          # 1 = highest priority
+    priority: int          # 1 = highest priority, 5 = lowest priority
+    pet_name: str = ""     # which pet this task belongs to
     completed: bool = False
 
 
@@ -20,7 +21,7 @@ class Pet:
     tasks: List[Task] = field(default_factory=list)
 
     def add_task(self, task: Task) -> None:
-        """Add a care task to this pet."""
+        """Add a care task to this pet, stamping pet_name on the task."""
         pass
 
     def remove_task(self, task_name: str) -> None:
@@ -30,8 +31,10 @@ class Pet:
 
 class Owner:
     def __init__(self, name: str, time_available_mins: int):
+        if time_available_mins <= 0:
+            raise ValueError("time_available_mins must be greater than 0")
         self.name = name
-        self.time_available_mins = time_available_mins  # daily time budget
+        self.time_available_mins = time_available_mins  # daily time budget in minutes
         self.pets: List[Pet] = []
 
     def add_pet(self, pet: Pet) -> None:
@@ -50,7 +53,8 @@ class Schedule:
         self.planned_tasks: List[Task] = []
 
     def generate(self) -> "Schedule":
-        """Select and order tasks within the owner's time budget, sorted by priority."""
+        """Select and order tasks within the owner's time budget, sorted by priority.
+        Priority approach: greedy by priority/ sort by priority/add tasks until time runs out"""
         pass
 
     def total_duration(self) -> int:
