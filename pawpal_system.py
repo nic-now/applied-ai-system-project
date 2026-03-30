@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import List, Optional
 
 
@@ -11,8 +11,10 @@ class Task:
     duration_mins: int
     priority: int           # 1 = highest priority, 5 = lowest priority
     frequency: str          # e.g. "daily", "weekly", "as needed"
-    pet_name: str = ""      # stamped when added to a Pet
+    pet_name: str = ""          # stamped when added to a Pet
     completed: bool = False
+    due_time: str = ""          # time of day e.g. "08:00"
+    due_date: Optional[date] = None  # calendar date for renewal tracking
 
     def mark_complete(self) -> None:
         """Mark this task as done."""
@@ -70,7 +72,9 @@ class Owner:
         self.pets: List[Pet] = []
 
     def add_pet(self, pet: Pet) -> None:
-        """Register a pet under this owner."""
+        """Register a pet under this owner. Raises ValueError if a pet with that name already exists."""
+        if self._find_pet(pet.name) is not None:
+            raise ValueError(f"A pet named '{pet.name}' already exists. Use a unique name.")
         self.pets.append(pet)
 
     def remove_pet(self, pet_name: str) -> None:
@@ -122,6 +126,76 @@ class Schedule:
                 self.skipped_tasks.append(task)
 
         return self
+
+    def mark_task_complete(self, task_name: str, pet_name: str) -> Optional[Task]:
+        """Mark a task complete and auto-create the next occurrence for daily/weekly tasks.
+        Returns the new Task if one was created, otherwise None."""
+        # find the pet
+        pet = self.owner._find_pet(pet_name)
+        if pet is None:
+            raise ValueError(f"Pet '{pet_name}' not found.")
+
+        # find the task on that pet
+        task = pet._find_task(task_name)
+        if task is None:
+            raise ValueError(f"Task '{task_name}' not found on {pet_name}.")
+
+        task.mark_complete()
+
+        # calculate next due_date using timedelta based on frequency
+        if task.frequency == "daily":
+            next_date = (task.due_date or date.today()) + timedelta(days=1)
+        elif task.frequency == "weekly":
+            next_date = (task.due_date or date.today()) + timedelta(weeks=1)
+        else:
+            return None  # "as needed" tasks don't auto-renew
+
+        # create a fresh copy for the next occurrence
+        renewed = Task(
+            name=task.name,
+            category=task.category,
+            duration_mins=task.duration_mins,
+            priority=task.priority,
+            frequency=task.frequency,
+            due_time=task.due_time,
+            due_date=next_date,
+        )
+        pet.add_task(renewed)  # stamps pet_name automatically
+        return renewed
+
+    def detect_conflicts(self) -> List[str]:
+        """Check planned tasks for scheduling conflicts (same due_time slot).
+        Returns a list of warning strings — never raises, never crashes."""
+        warnings = []
+
+        # group tasks by due_time; skip tasks with no time set
+        time_slots: dict = {}
+        for task in self.planned_tasks:
+            if not task.due_time:
+                continue
+            time_slots.setdefault(task.due_time, []).append(task)
+
+        # any slot with more than one task is a conflict
+        for time, tasks in time_slots.items():
+            if len(tasks) > 1:
+                names = ", ".join(f"{t.pet_name}: {t.name}" for t in tasks)
+                warnings.append(f"WARNING: Conflict at {time} — {names}")
+
+        return warnings
+
+    def sort_by_time(self) -> List[Task]:
+        """Return planned tasks sorted by due_time (HH:MM string).
+        Tasks with no due_time set are placed at the end."""
+        # lambda extracts due_time for comparison; "99:99" pushes empty strings to the end
+        return sorted(self.planned_tasks, key=lambda t: t.due_time if t.due_time else "99:99")
+
+    def filter_by_pet(self, pet_name: str) -> List[Task]:
+        """Return all owner tasks belonging to a specific pet."""
+        return [t for t in self.owner.get_all_tasks() if t.pet_name == pet_name]
+
+    def filter_by_status(self, completed: bool) -> List[Task]:
+        """Return all owner tasks matching the given completion status."""
+        return [t for t in self.owner.get_all_tasks() if t.completed == completed]
 
     def total_duration(self) -> int:
         """Return total minutes of all planned tasks."""
