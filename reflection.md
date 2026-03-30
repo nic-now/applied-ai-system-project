@@ -4,8 +4,9 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+- Core actions: add user/pet/tasks, schedule plan (e.g. walk) and display
+- Initial UML design: First UML included four classes (Owner, Pet, Schedule, Task), with adequate relationships and variables for each class.
+- Owner (in charge of owner's information e.g. name, availability), Pet (in charge of pet's information, e.g. name and description), Schedule (holds dates and planned tasks, in charge of overviewing schedules), Task (in charging of task information, e.g. description, priority, completed, ect.)
 
 **b. Design changes**
 
