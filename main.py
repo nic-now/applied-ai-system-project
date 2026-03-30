@@ -1,4 +1,7 @@
 #testing ground
+import sys
+sys.stdout.reconfigure(encoding="utf-8")  # allow emojis in Windows terminal
+
 from pawpal_system import Owner, Pet, Task, Schedule
 from datetime import date
 

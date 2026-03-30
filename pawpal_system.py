@@ -1,6 +1,17 @@
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import List, Optional
+from tabulate import tabulate
+
+# emoji indicators used in CLI and Streamlit UI — unknown categories fall back to 📋
+CATEGORY_EMOJI = {
+    "walk":       "🦮",
+    "feeding":    "🍽️",
+    "meds":       "💊",
+    "grooming":   "✂️",
+    "enrichment": "🧸",
+}
+PRIORITY_EMOJI = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢", 5: "🔵"}
 
 
 @dataclass
@@ -239,21 +250,44 @@ class Schedule:
         return sum(t.duration_mins for t in self.planned_tasks)
 
     def display(self) -> str:
-        """Return a human-readable summary of the schedule."""
+        """Return a human-readable summary of the schedule using tabulate for CLI output."""
         if not self.planned_tasks:
             return f"No tasks scheduled for {self.date}."
 
-        lines = [f"Schedule for {self.owner.name} — {self.date}",
-                 f"Time budget: {self.owner.time_available_mins}min | Planned: {self.total_duration()}min",
-                 "-" * 40]
+        header = (f"Schedule for {self.owner.name} — {self.date}\n"
+                  f"Time budget: {self.owner.time_available_mins}min | "
+                  f"Planned: {self.total_duration()}min")
 
-        for task in self.planned_tasks:
-            lines.append(f"  [{task.priority}] {task.pet_name}: {task.name} "
-                         f"({task.duration_mins}min, {task.frequency})")
+        # build rows for planned tasks with emoji indicators
+        rows = []
+        for task in self.sort_by_time():
+            cat_emoji  = CATEGORY_EMOJI.get(task.category, "📋")
+            pri_emoji  = PRIORITY_EMOJI.get(task.priority, "⚪")
+            mandatory  = "YES" if task.mandatory else ""
+            rows.append([
+                task.due_time or "--:--",
+                pri_emoji,
+                f"{cat_emoji} {task.name}",
+                task.pet_name,
+                f"{task.duration_mins} min",
+                task.frequency,
+                mandatory,
+            ])
+
+        table = tabulate(rows,
+                         headers=["Time", "Pri", "Task", "Pet", "Duration", "Frequency", "Mandatory"],
+                         tablefmt="rounded_outline")
+
+        result = f"{header}\n{table}"
 
         if self.skipped_tasks:
-            lines.append(f"\nSkipped ({len(self.skipped_tasks)} tasks didn't fit):")
-            for task in self.skipped_tasks:
-                lines.append(f"  - {task.pet_name}: {task.name} ({task.duration_mins}min)")
+            skipped_rows = [
+                [PRIORITY_EMOJI.get(t.priority, "⚪"), t.pet_name, t.name, f"{t.duration_mins} min"]
+                for t in self.skipped_tasks
+            ]
+            skipped_table = tabulate(skipped_rows,
+                                     headers=["Pri", "Pet", "Task", "Duration"],
+                                     tablefmt="simple")
+            result += f"\n\nSkipped ({len(self.skipped_tasks)} tasks didn't fit):\n{skipped_table}"
 
-        return "\n".join(lines)
+        return result
