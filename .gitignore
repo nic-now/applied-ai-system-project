@@ -1,5 +1,9 @@
 __pycache__/
 .venv/
+.venv-1/
 .venv_new/
 .pytest_cache/
 .DS_Store
+.claude/
+.claude
+CLAUDE.md

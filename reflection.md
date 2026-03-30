@@ -20,13 +20,15 @@
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
+- Scheduler cosiders time and priority constraints
 - How did you decide which constraints mattered most?
+- 
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+- A tradeoff scheduler has is ... , this is because ...
 
 ---
 
@@ -34,8 +36,10 @@
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+- Claude Code was used in this project for UML design brainstorming as well as correction, debugging, and implementation/understanding of logic.
+
+- Prompting for explanations of different ways relationships can be implemented helped to understand and choose the best approach given a task.
+- Asking about possible shortcomings/oversights in implementation also helped notice and improve code.
 
 **b. Judgment and verification**
 
