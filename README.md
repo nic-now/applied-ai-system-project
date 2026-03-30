@@ -43,6 +43,28 @@ The scheduler in `pawpal_system.py` includes improvements on top of basic priori
 - Conflict detection: prints a warning if two tasks are assigned the same time slot
 - Auto-renewal: completing a daily or weekly task automatically creates the next occurrence with an updated due date
 
+## Testing PawPal+
+
+Run the full test with:
+
+```bash
+python -m pytest
+```
+
+### What the tests cover
+
+- Task and pet management: completion, reset, adding tasks, pet name stamping, remove guards
+- Scheduling: time budget enforcement, priority ordering, happy path (all tasks fit)
+- Sorting: chronological order, tasks without a time slot go last
+- Recurrence: daily and weekly renewal creates the next occurrence; "as needed" tasks don't renew; renewed tasks are excluded from today's schedule
+- Conflict detection: flags duplicate time slots, ignores tasks with no time set
+
+### Confidence Level
+
+★★★★☆ (4/5)
+
+Core logic is well covered across both happy paths and edge cases. Still not every possible combination of constraints (e.g. multiple pets with mixed mandatory/optional tasks) has an explicit test yet.
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.
