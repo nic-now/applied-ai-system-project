@@ -32,6 +32,17 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+## Smarter Scheduling
+
+The scheduler in `pawpal_system.py` includes improvements on top of basic priority sorting:
+
+- Mandatory tasks first: tasks flagged as mandatory (e.g. medications) are always scheduled first, before any optional tasks
+- Future date filtering: tasks with a due date set in the future are automatically excluded from today's plan
+- Tie-breaking by duration: when tasks share the same priority, shorter ones are picked first to fit more into the time budget
+- Gap-filling: after the main pass, the scheduler does a second pass to slot any skipped tasks into leftover time
+- Conflict detection: prints a warning if two tasks are assigned the same time slot
+- Auto-renewal: completing a daily or weekly task automatically creates the next occurrence with an updated due date
+
 ### Suggested workflow
 
 1. Read the scenario carefully and identify requirements and edge cases.

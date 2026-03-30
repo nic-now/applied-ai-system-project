@@ -26,9 +26,8 @@
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
-- A tradeoff scheduler has is ... , this is because ...
+- A tradeoff the scheduler makes is using greedy priority-based selection, it picks tasks in priority order and takes the first one that fits, without looking ahead for a more optimal combination. This is reasonable because higher priority tasks (e.g. meds, feeding) should always be scheduled first, and the task list for a pet owner is small enough that perfect optimisation is not necessary.
+- A second tradeoff is in conflict detection, which only flags tasks with the exact same due_time string. Tasks that overlap in duration but start at different times are not detected. This is reasonable as computing duration overlap would add significant complexity for a minor edge case.
 
 ---
 

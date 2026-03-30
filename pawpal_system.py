@@ -11,10 +11,11 @@ class Task:
     duration_mins: int
     priority: int           # 1 = highest priority, 5 = lowest priority
     frequency: str          # e.g. "daily", "weekly", "as needed"
-    pet_name: str = ""          # stamped when added to a Pet
+    pet_name: str = ""               # stamped when added to a Pet
     completed: bool = False
-    due_time: str = ""          # time of day e.g. "08:00"
+    due_time: str = ""               # time of day e.g. "08:00"
     due_date: Optional[date] = None  # calendar date for renewal tracking
+    mandatory: bool = False          # if True, always scheduled first regardless of budget
 
     def mark_complete(self) -> None:
         """Mark this task as done."""
@@ -110,20 +111,56 @@ class Schedule:
         self.skipped_tasks: List[Task] = []  # tasks that didn't fit in the time budget
 
     def generate(self) -> "Schedule":
-        """Greedily select tasks sorted by priority (1=highest) within the time budget."""
+        """Select and order tasks within the owner's time budget.
+
+        Improvements applied:
+        1. Mandatory tasks are always scheduled first, regardless of budget.
+        2. Tasks with a due_date set in the future (past today) are filtered out.
+        3. Tie-breaking by duration (shortest first) fits more tasks into the budget.
+        4. A gap-filling pass schedules any skipped tasks that fit remaining time.
+        """
         self.planned_tasks = []
         self.skipped_tasks = []
 
-        # sort ascending: priority 1 comes first
-        pending = sorted(self.owner.get_pending_tasks(), key=lambda t: t.priority)
+        # improvement 2: filter out tasks not yet due (None due_date = always eligible)
+        all_pending = [
+            t for t in self.owner.get_pending_tasks()
+            if t.due_date is None or t.due_date <= self.date
+        ]
+
+        # improvement 1: split into mandatory and optional
+        mandatory = [t for t in all_pending if t.mandatory]
+        optional  = [t for t in all_pending if not t.mandatory]
+
+        # improvement 3: sort optional by (priority asc, duration asc) for tie-breaking
+        optional = sorted(optional, key=lambda t: (t.priority, t.duration_mins))
 
         time_remaining = self.owner.time_available_mins
-        for task in pending:
+
+        # schedule mandatory tasks first — warn if they overrun the budget
+        for task in mandatory:
+            self.planned_tasks.append(task)
+            time_remaining -= task.duration_mins
+        if time_remaining < 0:
+            print(f"WARNING: Mandatory tasks exceed time budget by {abs(time_remaining)} min.")
+
+        # greedy pass over optional tasks
+        for task in optional:
             if task.duration_mins <= time_remaining:
                 self.planned_tasks.append(task)
                 time_remaining -= task.duration_mins
             else:
                 self.skipped_tasks.append(task)
+
+        # improvement 4: gap-filling pass — try skipped tasks in the leftover time
+        still_skipped = []
+        for task in self.skipped_tasks:
+            if task.duration_mins <= time_remaining:
+                self.planned_tasks.append(task)
+                time_remaining -= task.duration_mins
+            else:
+                still_skipped.append(task)
+        self.skipped_tasks = still_skipped
 
         return self
 

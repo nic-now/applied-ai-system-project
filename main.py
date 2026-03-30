@@ -1,5 +1,6 @@
 #testing ground
 from pawpal_system import Owner, Pet, Task, Schedule
+from datetime import date
 
 
 #create owner and 3 pets
@@ -22,6 +23,12 @@ cat.add_task(Task(name="Playtime",       category="enrichment", duration_mins=20
 cat.add_task(Task(name="Brushing",       category="grooming",   duration_mins=15, priority=3, frequency="weekly", due_time="18:00"))
 
 bird.add_task(Task(name="Kiwi Feed",     category="feeding",    duration_mins=5,  priority=1, frequency="daily",  due_time="08:00"))  # intentional conflict with Mochi: Breakfast
+
+# mandatory task — always scheduled first regardless of priority or budget
+dog.add_task(Task(name="Insulin Injection", category="meds", duration_mins=5, priority=1, frequency="daily", due_time="07:30", mandatory=True))
+
+# future-dated task — should be filtered out of today's schedule
+cat.add_task(Task(name="Vet Checkup", category="meds", duration_mins=60, priority=2, frequency="as needed", due_date=date(2026, 4, 15)))
 
 # mark one task complete to demo filter_by_status()
 dog.tasks[0].mark_complete()
