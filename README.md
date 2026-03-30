@@ -14,10 +14,10 @@ Your job is to design the system first (UML), then implement the logic in Python
 
 ## What you will build
 
-Your final app should:
+Final app can:
 
 - Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
+- Let a user add tasks (duration + priority at minimum)
 - Generate a daily schedule/plan based on constraints and priorities
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
@@ -31,6 +31,37 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+### Run the Streamlit app
+
+```bash
+streamlit run app.py
+```
+
+### Run the demo script
+
+```bash
+python main.py
+```
+
+### Run the tests
+
+```bash
+python -m pytest
+```
+
+## Features
+
+- Task management: create tasks with a name, category, duration, priority, frequency, and optional due time — each task is linked to a specific pet
+- Pet profiles: store pet details and manage their task list, including adding and removing tasks
+- Owner setup: register multiple pets under one owner with a daily time budget
+- Priority-based scheduling: the scheduler selects tasks in priority order (1 = highest) and fits them within the owner's available time
+- Mandatory tasks: tasks flagged as mandatory are always scheduled first, regardless of priority or time remaining
+- Sorting by time: planned tasks can be sorted chronologically by their due time (HH:MM)
+- Conflict warnings: the scheduler detects when two tasks share the same time slot and surfaces a warning in the UI
+- Daily recurrence: completing a daily or weekly task automatically creates the next occurrence with an updated due date
+- Filtering: tasks can be filtered by pet name or completion status
+- Streamlit UI: a multi-section web app lets users set up their owner, add pets and tasks, and generate and view today's schedule
 
 ## Smarter Scheduling
 
@@ -65,12 +96,8 @@ python -m pytest
 
 Core logic is well covered across both happy paths and edge cases. Still not every possible combination of constraints (e.g. multiple pets with mixed mandatory/optional tasks) has an explicit test yet.
 
-### Suggested workflow
+### Demo
+<a href="imgs/demo.jpg" target="_blank"><img src='imgs/demo.jpg' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+### UML diagram
+<a href="imgs/uml-design.png" target="_blank"><img src='imgs/uml-design.png' title='UML design' width='' alt='PawPal App UML design' class='center-block' /></a>

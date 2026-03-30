@@ -10,19 +10,19 @@
 
 **b. Design changes**
 
-- Design did change during implementation.
+- Design did change during implementation (functions/properties).
 - For example, relationship from pet to task was added, so that task can be associated with a specific pet too (since an owner might have multiple pets)
 - Safeguards were also added based on recommendations by Claude Code (e.g. check time_available_mins)
 
+<a href="imgs/uml-design.png" target="_blank"><img src='imgs/uml-design.png' title='UML design' width='' alt='PawPal App UML design' class='center-block' /></a>
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
 
 **a. Constraints and priorities**
 
-- Scheduler cosiders time and priority constraints
-- How did you decide which constraints mattered most?
-- 
+- Scheduler considers time and priority constraints
+- Time was chosen as the main constraint since a pet owner has a fixed daily budget and not all tasks will fit. Priority was chosen as the sorting key since some tasks (e.g. meds) are more critical than others and should always be scheduled first.
 
 **b. Tradeoffs**
 
@@ -42,8 +42,9 @@
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+- When Claude suggested simplifying detect_conflicts() with a list comprehension, the change was not applied since the original was already clear enough.
+- When Claude offered a knapsack algorithm as an alternative to greedy scheduling, greedy was chosen instead as it was easier to understand and debug for this scale of project.
+- Suggestions were verified by reading the generated code before accepting, running the app to check behaviour, and asking follow-up questions when  reasoning wasn't clear.
 
 ---
 
@@ -51,13 +52,13 @@
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+- Task lifecycle (mark_complete, reset), pet task management (add, remove, pet name stamping), scheduling behaviour (time budget enforcement, priority ordering), sorting by time, and conflict detection.
+- These were important because they cover the core logic the app depends on — a bug in scheduling or task management would affect every other feature.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+- Fairly confident the core scheduling logic works correctly across the tested cases. The greedy algorithm is simple enough that its behaviour is predictable.
+- Edge cases to test next: multiple mandatory tasks that together exceed the time budget, tasks with identical names on the same pet, and scheduling with no due_time set on any task.
 
 ---
 
@@ -65,12 +66,14 @@
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+- The class structure came together cleanly from the star. Starting with a UML design before writing code made it easier to understand how the classes should relate to each other before getting into implementation details.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+- The conflict detection only flags tasks at the exact same time slot. With more time, it could be improved to check for overlapping durations, which would make the warnings more accurate and useful for a real pet owner.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+- Designing the system first (even roughly/brainstorming) before writing code saves a lot of rework later. 
+- Working with AI was most useful when asking it to explain tradeoffs rather than just generate code
+- Understanding why a decision was made helped evaluate whether it actually fit the project.
