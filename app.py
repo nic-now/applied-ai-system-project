@@ -169,3 +169,67 @@ if st.session_state.schedule:
         st.markdown("**Skipped tasks** (did not fit in time budget):")
         st.table([{"pet": t.pet_name, "task": t.name, "mins": t.duration_mins,
                    "priority": t.priority} for t in sched.skipped_tasks])
+
+st.divider()
+
+
+# --- Step 5: AI Schedule Advisor ---
+# Based on Week 9 (BugHound) agent pattern: PLAN → ANALYZE → SUGGEST → EVALUATE → REFLECT
+st.subheader("5. AI Schedule Advisor")
+st.caption(
+    "Analyzes your schedule and suggests improvements. "
+    "Works offline with rule-based heuristics; add a GEMINI_API_KEY to .env for AI-powered analysis."
+)
+
+if "advisor_result" not in st.session_state:
+    st.session_state.advisor_result = None
+
+run_disabled = st.session_state.schedule is None
+if st.button("Run AI Advisor", disabled=run_disabled):
+    from ai_advisor import ScheduleAdvisorAgent
+    with st.spinner("Analyzing your schedule..."):
+        agent  = ScheduleAdvisorAgent()
+        result = agent.run(st.session_state.schedule)
+        st.session_state.advisor_result = result
+
+if run_disabled and st.session_state.advisor_result is None:
+    st.info("Generate a schedule above to enable the AI Advisor.")
+
+if st.session_state.advisor_result:
+    result = st.session_state.advisor_result
+
+    # --- mode badge ---
+    mode = result.get("mode", "Heuristic")
+    is_ai = mode == "Gemini AI"
+    st.caption(f"Analysis mode: {'🤖 Gemini AI' if is_ai else '⚙️ Heuristic (no API key)'}")
+
+    # --- quality score ---
+    q = result["quality"]
+    level_color = {"Excellent": "green", "Good": "blue", "Fair": "orange", "Poor": "red"}
+    st.markdown(f"**Schedule Quality: {q['level']} — {q['score']}/100**")
+    st.progress(q["score"] / 100)
+    st.caption(q["summary"])
+
+    # --- issues ---
+    if result["issues"]:
+        st.markdown("**Issues Found:**")
+        sev_icon = {"High": "🔴", "Medium": "🟠", "Low": "🟡"}
+        for issue in result["issues"]:
+            icon = sev_icon.get(issue["severity"], "⚪")
+            st.markdown(f"{icon} **{issue['severity']}** — {issue['msg']}")
+    else:
+        st.success("No issues found — your schedule looks great!")
+
+    # --- suggestions ---
+    if result["suggestions"]:
+        st.markdown("**Suggestions:**")
+        pri_icon = {"High": "🔴", "Medium": "🟠", "Low": "🟡"}
+        for s in result["suggestions"]:
+            icon = pri_icon.get(s["priority"], "⚪")
+            with st.expander(f"{icon} {s['action']}"):
+                st.write(s["reason"])
+
+    # --- agent execution trace (observable intermediate steps) ---
+    with st.expander("Agent execution trace"):
+        for entry in result["logs"]:
+            st.text(f"[{entry['step']}] {entry['message']}")
