@@ -15,7 +15,7 @@ def make_pet(name="Mochi"):
     return Pet(name=name, species="Dog", breed="Shiba Inu")
 
 def make_owner(time=60):
-    return Owner(name="Nicole", time_available_mins=time)
+    return Owner(name="Jane", time_available_mins=time)
 
 
 # Task Completion: Verify that calling mark_complete() actually changes the task's status.
@@ -242,3 +242,239 @@ def test_remove_pet_raises_for_missing_pet():
     owner.add_pet(make_pet("Mochi"))
     with pytest.raises(ValueError):
         owner.remove_pet("Ghost")
+
+
+# =============================================================================
+# AI Advisor Tests (heuristic mode — no API key required)
+# Mirrors previous class code for reliability harness pattern (Mod 5)
+# All tests use MockClient so they run offline and deterministically
+# =============================================================================
+
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from ai_advisor import ScheduleAdvisorAgent, MockClient
+
+
+def make_schedule_with_tasks(tasks, time=120):
+    """Helper: build an Owner + Schedule with the given Task list already generated."""
+    owner = make_owner(time=time)
+    pet   = make_pet()
+    for t in tasks:
+        pet.add_task(t)
+    owner.add_pet(pet)
+    sched = Schedule(owner)
+    sched.generate()
+    return sched
+
+
+# --- MockClient unit tests ---
+
+def test_advisor_mock_flags_missing_feeding():
+    """A schedule with no feeding task should trigger a High-severity issue."""
+    mock = MockClient()
+    context = {
+        "planned_tasks": [{"name": "Walk", "category": "walk", "duration_mins": 30,
+                           "priority": 1, "pet_name": "Mochi", "mandatory": False, "frequency": "daily"}],
+        "skipped_tasks": [],
+        "pets": [{"name": "Mochi", "species": "Dog", "breed": "Shiba Inu"}],
+        "total_planned_mins": 30,
+        "time_budget_mins": 120,
+    }
+    issues = mock.analyze(context)
+    types_ = [i["type"] for i in issues]
+    assert "Missing task" in types_
+    high = [i for i in issues if i["severity"] == "High"]
+    assert any("feeding" in i["msg"].lower() for i in high)
+
+
+def test_advisor_mock_flags_dog_missing_walk():
+    """A dog with no walk task should trigger a Medium-severity issue."""
+    mock = MockClient()
+    context = {
+        "planned_tasks": [{"name": "Feeding", "category": "feeding", "duration_mins": 10,
+                           "priority": 1, "pet_name": "Mochi", "mandatory": False, "frequency": "daily"}],
+        "skipped_tasks": [],
+        "pets": [{"name": "Mochi", "species": "Dog", "breed": "Shiba Inu"}],
+        "total_planned_mins": 10,
+        "time_budget_mins": 120,
+    }
+    issues = mock.analyze(context)
+    medium = [i for i in issues if i["severity"] == "Medium"]
+    assert any("walk" in i["msg"].lower() for i in medium)
+
+
+def test_advisor_mock_flags_empty_schedule():
+    """An empty schedule should trigger a High-severity 'Empty schedule' issue."""
+    mock = MockClient()
+    context = {
+        "planned_tasks": [],
+        "skipped_tasks": [],
+        "pets": [{"name": "Mochi", "species": "Dog", "breed": "Shiba Inu"}],
+        "total_planned_mins": 0,
+        "time_budget_mins": 60,
+    }
+    issues = mock.analyze(context)
+    assert any(i["type"] == "Empty schedule" for i in issues)
+
+
+def test_advisor_mock_score_poor_for_high_severity_issues():
+    """Multiple High-severity issues should produce a Poor quality score."""
+    mock = MockClient()
+    issues = [
+        {"type": "Missing task",   "severity": "High",   "msg": "No feeding"},
+        {"type": "Empty schedule", "severity": "High",   "msg": "No tasks"},
+        {"type": "Low activity",   "severity": "Medium", "msg": "Too little time"},
+    ]
+    quality = mock.evaluate({}, issues)
+    assert quality["score"] <= 39
+    assert quality["level"] == "Poor"
+
+
+def test_advisor_mock_score_excellent_for_no_issues():
+    """Zero issues should produce a score of 100 and Excellent level."""
+    mock = MockClient()
+    quality = mock.evaluate({}, [])
+    assert quality["score"] == 100
+    assert quality["level"] == "Excellent"
+
+
+def test_advisor_mock_flags_feeding_per_pet_not_globally():
+    """If pet A has feeding but pet B doesn't, only pet B should be flagged — not 100/100."""
+    mock = MockClient()
+    context = {
+        "planned_tasks": [
+            {"name": "Walk",    "category": "walk",    "duration_mins": 30, "priority": 1,
+             "pet_name": "Mochi", "mandatory": False, "frequency": "daily"},
+            {"name": "Feeding", "category": "feeding", "duration_mins": 10, "priority": 1,
+             "pet_name": "Mochi", "mandatory": True,  "frequency": "daily"},
+            {"name": "Walk",    "category": "walk",    "duration_mins": 20, "priority": 1,
+             "pet_name": "Luna",  "mandatory": False,  "frequency": "daily"},
+        ],
+        "skipped_tasks": [],
+        "pets": [
+            {"name": "Mochi", "species": "Dog", "breed": "Shiba Inu"},
+            {"name": "Luna",  "species": "Dog", "breed": "Labrador"},
+        ],
+        "total_planned_mins": 60,
+        "time_budget_mins": 120,
+    }
+    issues = mock.analyze(context)
+    feeding_issues = [i for i in issues if "feeding" in i["msg"].lower()]
+    assert len(feeding_issues) == 1
+    assert "Luna" in feeding_issues[0]["msg"]
+    assert "Mochi" not in feeding_issues[0]["msg"]
+    quality = mock.evaluate(context, issues)
+    assert quality["score"] < 100
+
+
+def test_advisor_mock_suggests_add_feeding_when_missing():
+    """MockClient.suggest should recommend adding a feeding task when it's absent."""
+    mock = MockClient()
+    issues = [{"type": "Missing task", "severity": "High",
+               "msg": "Mochi has no feeding task scheduled — regular meals are essential."}]
+    suggestions = mock.suggest({}, issues)
+    assert any("feeding" in s["action"].lower() for s in suggestions)
+
+
+# --- ScheduleAdvisorAgent integration tests (heuristic mode) ---
+
+def test_advisor_agent_runs_full_pipeline():
+    """ScheduleAdvisorAgent.run() should return all required keys."""
+    sched  = make_schedule_with_tasks([make_task("Walk", 30, 1), make_task("Feeding", 15, 2)])
+    agent  = ScheduleAdvisorAgent()
+    result = agent.run(sched)
+    assert "issues"      in result
+    assert "suggestions" in result
+    assert "quality"     in result
+    assert "logs"        in result
+    assert "mode"        in result
+
+
+def test_advisor_agent_logs_all_five_steps():
+    """Execution trace must contain entries for all five pipeline steps."""
+    sched  = make_schedule_with_tasks([make_task("Walk", 30, 1)])
+    agent  = ScheduleAdvisorAgent()
+    result = agent.run(sched)
+    steps  = {entry["step"] for entry in result["logs"]}
+    assert steps >= {"PLAN", "ANALYZE", "SUGGEST", "EVALUATE", "REFLECT"}
+
+
+def test_advisor_agent_quality_score_in_range():
+    """Quality score must always be an integer between 0 and 100."""
+    sched  = make_schedule_with_tasks([make_task("Walk", 30, 1)])
+    agent  = ScheduleAdvisorAgent()
+    result = agent.run(sched)
+    score  = result["quality"]["score"]
+    assert isinstance(score, int)
+    assert 0 <= score <= 100
+
+
+def test_advisor_agent_detects_issue_on_empty_schedule():
+    """Agent should flag issues when the schedule has no planned tasks."""
+    owner = make_owner(time=5)   # tiny budget — nothing fits
+    pet   = make_pet()
+    pet.add_task(make_task("Walk", 60, 1))
+    owner.add_pet(pet)
+    sched  = Schedule(owner)
+    sched.generate()
+    agent  = ScheduleAdvisorAgent()
+    result = agent.run(sched)
+    assert len(result["issues"]) > 0
+
+
+# --- Evaluation harness: run all advisor scenarios and print a summary ---
+# Run with: python -m pytest tests/test_pawpal.py -v -k "advisor"
+
+EVAL_CASES = [
+    {
+        "label": "Complete schedule (walk + feeding)",
+        "tasks": [make_task("Walk", 30, 1), Task(name="Feeding", category="feeding",
+                   duration_mins=15, priority=2, frequency="daily")],
+        "time":  120,
+        "expect_max_issues": 1,
+    },
+    {
+        "label": "Missing feeding only",
+        "tasks": [make_task("Walk", 30, 1)],
+        "time":  60,
+        "expect_max_issues": 2,
+    },
+    {
+        "label": "Empty schedule (budget too small)",
+        "tasks": [make_task("Walk", 90, 1)],
+        "time":  10,
+        "expect_max_issues": 3,
+    },
+]
+
+
+def test_evaluation_harness_summary(capsys):
+    """
+    Evaluation harness: runs the advisor on multiple scenarios and prints a
+    pass/fail summary with confidence scores. Mirrors the reliability harness
+    described in the CodePath Module 5 rubric.
+    """
+    passed = 0
+    total  = len(EVAL_CASES)
+
+    for case in EVAL_CASES:
+        owner = make_owner(time=case["time"])
+        pet   = make_pet()
+        for t in case["tasks"]:
+            pet.add_task(t)
+        owner.add_pet(pet)
+        sched  = Schedule(owner)
+        sched.generate()
+        agent  = ScheduleAdvisorAgent()
+        result = agent.run(sched)
+
+        n_issues = len(result["issues"])
+        score    = result["quality"]["score"]
+        ok       = n_issues <= case["expect_max_issues"]
+        if ok:
+            passed += 1
+        status = "PASS" if ok else "FAIL"
+        print(f"  [{status}] {case['label']} — {n_issues} issue(s), score {score}/100")
+
+    print(f"\n  Evaluation harness: {passed}/{total} cases passed")
+    assert passed == total, f"Only {passed}/{total} evaluation cases passed"
