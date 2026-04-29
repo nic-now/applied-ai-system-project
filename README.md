@@ -1,103 +1,244 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ — AI-Powered Pet Care Scheduler
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+> CodePath Applied AI — Final Project
 
-## Scenario
+**Loom walkthrough:** *[LINK]*
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+---
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+## Base Project
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+**Original project:** PawPal+
 
-## What you will build
+PawPal+ is a Streamlit web app that helps a busy pet owner plan and track daily care tasks for their pets. 
+- The original system lets users register an owner, add pets, add care tasks (with name, category, duration, priority, and frequency), and generates a greedy priority-based schedule that fits within the owner's daily time budget. 
+- It also handled mandatory tasks, conflict detection, and a Streamlit UI.
 
-Final app can:
+---
 
-- Let a user enter basic owner + pet info
-- Let a user add tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+## Final Version: What's New
 
-## Getting started
+The final version adds an **AI Schedule Advisor**, an agentic workflow that analyzes the generated schedule, identifies care gaps, and suggests specific improvements. This feature is fully integrated into the Streamlit UI (step 5 of app).
 
-### Setup
+The schedule advisor follows the same multi-step pipeline as Week 9 Tinker (BugHound) agent:
+
+```
+PLAN → ANALYZE → SUGGEST → EVALUATE → REFLECT
+```
+
+Every step is logged so the intermediate reasoning is visible in the UI's "Agent execution trace" panel.
+
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────┐
+│                    Streamlit UI (app.py)              │
+│  Steps 1-4: Owner / Pet / Task / Schedule (existing) │
+│  Step 5: AI Advisor button → ScheduleAdvisorAgent    │
+└─────────────────────────┬────────────────────────────┘
+                          │ Schedule object
+                          ▼
+┌──────────────────────────────────────────────────────┐
+│           ScheduleAdvisorAgent  (ai_advisor.py)      │
+│                                                      │
+│  PLAN     build serialisable context dict            │
+│  ANALYZE  identify issues (LLM or heuristics)        │
+│  SUGGEST  propose improvements (LLM or heuristics)   │
+│  EVALUATE score quality 0-100 (heuristic, reliable)  │
+│  REFLECT  assemble result + log trace                │
+└──────┬───────────────────────────┬───────────────────┘
+       │ GEMINI_API_KEY set        │ no key / API error
+       ▼                           ▼
+┌─────────────┐           ┌────────────────┐
+│ GeminiClient│           │  MockClient    │
+│ (API key)   │           │  (heuristics)  │
+└─────────────┘           └────────────────┘
+       │
+       ▼
+  System prompt + user prompt → JSON response
+  Parsed into issues / suggestions lists
+
+┌──────────────────────────────────────────────────────┐
+│                  Test Suite  (pytest)                │
+│  test_pawpal.py  — scheduling logic (19 tests)       │
+│                  — advisor heuristics (8 tests)      │
+│                  — evaluation harness (1 harness)    │
+└──────────────────────────────────────────────────────┘
+```
+
+The class diagram (PNG) can be seen in [assets/class-diagram.png](assets/class-diagram.png).
+
+---
+
+## Setup Instructions
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/nic-now/applied-ai-system-project.git
+cd applied-ai-system-final
+```
+
+### 2. Create and activate a virtual environment
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# Windows:
+.venv\Scripts\activate
+# macOS / Linux:
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### Run the Streamlit app
+### 4. (Optional) Add Gemini API key
+
+The AI Advisor works offline with heuristics (no key needed) but can also work with an API key. To enable Gemini AI analysis:
+
+```bash
+cp .env.example .env
+# then open .env and paste your GEMINI_API_KEY
+```
+
+### 5. Run the app
 
 ```bash
 streamlit run app.py
 ```
 
-### Run the demo script
-
-```bash
-python main.py
-```
-
-### Run the tests
+### 6. Run tests
 
 ```bash
 python -m pytest
+# AI advisor tests only:
+python -m pytest tests/test_pawpal.py -v -k "advisor"
 ```
 
-## Features
+---
 
-- Task management: create tasks with a name, category, duration, priority, frequency, and optional due time — each task is linked to a specific pet
-- Pet profiles: store pet details and manage their task list, including adding and removing tasks
-- Owner setup: register multiple pets under one owner with a daily time budget
-- Priority-based scheduling: the scheduler selects tasks in priority order (1 = highest) and fits them within the owner's available time
-- Mandatory tasks: tasks flagged as mandatory are always scheduled first, regardless of priority or time remaining
-- Sorting by time: planned tasks can be sorted chronologically by their due time (HH:MM)
-- Conflict warnings: the scheduler detects when two tasks share the same time slot and surfaces a warning in the UI
-- Daily recurrence: completing a daily or weekly task automatically creates the next occurrence with an updated due date
-- Filtering: tasks can be filtered by pet name or completion status
-- Streamlit UI: a multi-section web app lets users set up their owner, add pets and tasks, and generate and view today's schedule
+## Sample Interactions
 
-## Smarter Scheduling
+### Example 1: Well-covered schedule (Excellent)
 
-The scheduler in `pawpal_system.py` includes improvements on top of basic priority sorting:
+**Input:** Jane, 120 min budget. Mochi (Dog). Tasks: Morning Walk 30 min pri 1, Feeding 15 min pri 2, Meds 10 min pri 1 mandatory.
 
-- Mandatory tasks first: tasks flagged as mandatory (e.g. medications) are always scheduled first, before any optional tasks
-- Future date filtering: tasks with a due date set in the future are automatically excluded from today's plan
-- Tie-breaking by duration: when tasks share the same priority, shorter ones are picked first to fit more into the time budget
-- Gap-filling: after the main pass, the scheduler does a second pass to slot any skipped tasks into leftover time
-- Conflict detection: prints a warning if two tasks are assigned the same time slot
-- Auto-renewal: completing a daily or weekly task automatically creates the next occurrence with an updated due date
+**AI Advisor output:**
+```
+Schedule Quality: Excellent — 100/100
+"Schedule covers all essential care areas — great job!"
 
-## Testing PawPal+
-
-Run the full test with:
-
-```bash
-python -m pytest
+No issues found.
+Suggestion (Low): Consider adding enrichment activities such as puzzle toys or training sessions.
 ```
 
-### What the tests cover
+---
 
-- Task and pet management: completion, reset, adding tasks, pet name stamping, remove guards
-- Scheduling: time budget enforcement, priority ordering, happy path (all tasks fit)
-- Sorting: chronological order, tasks without a time slot go last
-- Recurrence: daily and weekly renewal creates the next occurrence; "as needed" tasks don't renew; renewed tasks are excluded from today's schedule
-- Conflict detection: flags duplicate time slots, ignores tasks with no time set
+### Example 2: Missing feeding (Fair)
 
-### Confidence Level
+**Input:** Jane, 60 min budget. Mochi (Dog). Tasks: Morning Walk 30 min pri 1.
 
-★★★★☆ (4/5)
+**AI Advisor output:**
+```
+Schedule Quality: Fair — 75/100
+"Schedule is missing some important care elements."
 
-Core logic is well covered across both happy paths and edge cases. Still not every possible combination of constraints (e.g. multiple pets with mixed mandatory/optional tasks) has an explicit test yet.
+🔴 High — No feeding task scheduled — regular meals are the most critical pet care need.
+🟠 Medium — Mochi is a dog with no feeding scheduled.
 
-### Demo
-<a href="imgs/demo.jpg" target="_blank"><img src='imgs/demo.jpg' title='PawPal App' width='' alt='PawPal App' class='center-block' /></a>
+Suggestion (High): Add a 'Feeding' task with priority 1 and mark it Mandatory.
+Suggestion (Medium): Add a 30-minute walk for Mochi.
+```
 
-### UML diagram
-<a href="imgs/uml-design.png" target="_blank"><img src='imgs/uml-design.png' title='UML design' width='' alt='PawPal App UML design' class='center-block' /></a>
+---
+
+### Example 3: Empty schedule (Poor)
+
+**Input:** Jane, 10 min budget. Mochi (Dog). Tasks: Morning Walk 60 min pri 1 (won't fit).
+
+**AI Advisor output:**
+```
+Schedule Quality: Poor — 40/100
+"Schedule needs significant improvements for your pet's wellbeing."
+
+🔴 High — No tasks were scheduled. Check your time budget or add more tasks.
+🟠 Medium — Mochi is a dog with no walk scheduled.
+🟠 Medium — High-priority tasks skipped due to time constraints: Morning Walk.
+
+Suggestion (High): Add at least one task per pet and set a time budget above 15 minutes.
+```
+
+---
+
+## Design Decisions
+
+**Why a multi-step pipeline instead of one big prompt?**
+- Breaking the workflow into PLAN → ANALYZE → SUGGEST → EVALUATE → REFLECT makes each step's output observable in the trace log. 
+- This mirrors (Week 9) previous example architecture and makes it easy to see where the agent's reasoning went wrong if results are unexpected.
+
+**Why heuristic fallback?**
+- LLMs can return malformed JSON or empty responses.
+- Having a deterministic MockClient means the advisor always produces output, and the scoring step always uses heuristics so quality scores are consistent and testable.
+
+**Why is EVALUATE always heuristic?**
+- A score derived from counting issue severity is reproducible and predictable. 
+- If the evaluate step used the LLM, the same schedule could get 70/100 one run and 85/100 the next, making tests meaningless.
+
+**Why greedy scheduling?**
+- The original scheduling algorithm was kept intentionally simple. 
+- The AI Advisor handles a 'smarter' layer by flagging when the greedy result is suboptimal.
+
+---
+
+## Testing Summary
+
+```
+python -m pytest -v
+```
+
+| Test group | Tests | Notes |
+|---|---|---|
+| Scheduling logic | 19 | Time budget, priority, recurrence, conflicts |
+| Advisor heuristics | 8 | MockClient analyze/suggest/evaluate |
+| Evaluation harness | 1 | Runs 3 scenarios, prints pass/fail + scores |
+| **Total** | **28** | All pass in heuristic mode (no API key needed) |
+
+
+**What worked:** The heuristic rules correctly catch the most common care gaps (missing feeding, missing dog walk, empty schedule). The five-step log trace made it easy to debug which step was producing unexpected output.
+
+**What didn't:** The Gemini model occasionally wraps JSON in markdown code fences despite the system prompt saying not to. The `_parse_json_array` fallback parser handles this in most cases, but very unusual formatting can still cause a fallback to heuristics.
+
+**Confidence level: 4/5** — Core scheduling and advisor heuristics are well covered. AI-mode responses are tested manually rather than automatically because LLM output is non-deterministic.
+
+---
+
+## Reflection
+
+- The main thing this project taught me is that building around the AI call can be harder than the AI call itself. Writing the fallback (MockClient here) first forced me to think clearly about what the agent actually needed to do, it meant the app had to work end to end before ever toucheing the API.
+
+- The main limitation is that the Schedule advisor only sees what's in the schedule. It doesn't know the pet's age, health, or history, so suggestions are general. Adding a short pet profile to the context would make them much more useful.
+
+---
+
+## Overview of File Structure
+
+```
+applied-ai-system-final/
+├── app.py                  # Streamlit UI (Steps 1-5)
+├── pawpal_system.py        # Core classes: Owner, Pet, Task, Schedule
+├── ai_advisor.py           # AI Advisor agent (new — Module 5)
+├── main.py                 # CLI demo script
+├── requirements.txt
+├── .env.example            # Copy to .env and add GEMINI_API_KEY
+├── tests/
+│   └── test_pawpal.py      # pytest suite (scheduling + advisor)
+├── assets/
+│   └── class-diagram.png  # Class diagram 
+├── model_card.md           # Reflection
+└── README.md
+```
