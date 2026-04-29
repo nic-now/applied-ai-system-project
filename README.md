@@ -195,6 +195,20 @@ Suggestion (High): Add at least one task per pet and set a time budget above 15 
 
 ---
 
+## Reliability & Guardrails
+
+Two mechanisms keep the advisor from breaking:
+
+
+**Evaluation harness:** `test_evaluate_harness` runs three scenarios (full schedule, missing feeding, empty schedule) and checks scores land in the right range. Because the EVALUATE step is always heuristic, scores are deterministic and the test results are reproducible.
+
+
+**Guardrails in place:**
+- The quality score is always heuristic , not LLM-generated, so it can't be inflated by a hallucinating model
+- The fallback to MockClient means the app never crashes or returns nothing, even on API failure
+- Issue severity is constrained to a fixed enum (`High / Medium / Low`) so the model called can't invent new categories
+---
+
 ## Testing Summary
 
 ```
