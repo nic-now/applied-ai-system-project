@@ -2,7 +2,7 @@
 
 > CodePath Applied AI — Final Project
 
-**Loom walkthrough:** *[LINK]*
+**Loom walkthrough:** *[LINK](https://www.loom.com/share/1702a257c7ef4b00844de7b380ac21a9)*
 
 ---
 
