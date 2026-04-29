@@ -1,0 +1,3 @@
+Analyze this pet care schedule and return a JSON array of issues:
+
+{{CONTEXT}}

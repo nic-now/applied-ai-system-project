@@ -1,0 +1,8 @@
+Here is the current pet care schedule:
+
+{{CONTEXT}}
+
+Issues identified:
+{{ISSUES}}
+
+Return a JSON array of improvement suggestions.
